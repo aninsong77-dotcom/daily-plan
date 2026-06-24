@@ -1,4 +1,4 @@
-const CACHE = "droplet-manager-v2";
+const CACHE = "droplet-manager-v3";
 const FILES = [
   "./",
   "./index.html",
