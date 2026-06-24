@@ -1,1001 +1,544 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>일일계획</title>
-<link rel="manifest" href="manifest.json">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{width:100%;height:100%;overflow:hidden;touch-action:none;
-  font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,sans-serif;
-  background:#ffffff;}
-#sky{display:none;}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>물방울 매니저</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-/* 하늘 캔버스 — 비활성 */
-#sky{display:none;}
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+      font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    }
 
-/* 블롭 SVG — 전체 화면 */
-#blob-svg{position:fixed;inset:0;width:100%;height:100%;z-index:1;overflow:visible;pointer-events:none;}
-#blob-path{pointer-events:all;cursor:pointer;transition:opacity .2s;}
-#blob-path:active{opacity:.85;}
+    body {
+      display: grid;
+      place-items: center;
+      touch-action: manipulation;
+    }
 
-/* 블롭 중앙 정보 */
-#blob-info{
-  display:none;
-  position:fixed;z-index:2;pointer-events:none;
-  transform:translate(-50%,-50%);
-  text-align:center;
-}
-#bi-date{font-size:12px;font-weight:700;color:rgba(255,255,255,0.82);letter-spacing:-.2px;}
-#bi-count{font-size:32px;font-weight:900;color:#fff;line-height:1.1;margin-top:1px;}
-#bi-sub{font-size:11px;color:rgba(255,255,255,.7);margin-top:3px;}
+    .room {
+      position: relative;
+      width: 100vw;
+      height: 100dvh;
+      min-height: 420px;
+      display: grid;
+      place-items: center;
+      background: #fff;
+    }
 
-/* 블롭 음성 상태 — 듣는 중 링 */
-@keyframes listen-ring{
-  0%{transform:translate(-50%,-50%) scale(1);opacity:0.5;}
-  100%{transform:translate(-50%,-50%) scale(1.55);opacity:0;}
-}
-#listen-ring{
-  position:fixed;z-index:1;border-radius:50%;
-  border:2px solid rgba(255,255,255,0.7);
-  pointer-events:none;
-  display:none;
-  transform:translate(-50%,-50%);
-}
-#listen-ring.on{display:block;animation:listen-ring 1.4s ease-out infinite;}
-#bi-hint{font-size:11px;color:rgba(255,255,255,0.45);margin-top:8px;letter-spacing:.3px;transition:opacity .3s;}
+    .drop-zone {
+      position: relative;
+      width: min(54vw, 260px);
+      min-width: 168px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+    }
 
-/* 상단바 */
-#topbar{
-  position:fixed;top:0;left:0;right:0;z-index:100;
-  height:calc(env(safe-area-inset-top,0px)+56px);
-  padding-top:env(safe-area-inset-top,0px);
-  display:flex;align-items:center;padding-left:16px;padding-right:12px;gap:8px;
-  pointer-events:none;
-}
-#topbar>*{pointer-events:all;}
-#date-label{color:#555;font-size:15px;font-weight:800;flex:1;letter-spacing:-.3px;}
-.tbtn{
-  width:40px;height:40px;border-radius:50%;border:none;
-  background:rgba(0,0,0,0.06);color:#555;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  box-shadow:0 1px 4px rgba(0,0,0,0.08);
-}
-.tbtn:active{background:rgba(0,0,0,0.12);}
+    .drop {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      filter: none;
+      animation: breathe 5.2s ease-in-out infinite;
+      cursor: pointer;
+    }
 
-/* 색상 패널 */
-#color-panel{
-  position:fixed;top:calc(env(safe-area-inset-top,0px)+64px);right:12px;z-index:200;
-  background:rgba(255,255,255,0.93);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-radius:20px;padding:16px 16px 14px;
-  box-shadow:0 8px 40px rgba(0,0,0,0.28);
-  transform:translateY(-8px) scale(0.96);opacity:0;pointer-events:none;transition:all .2s;
-  min-width:168px;
-}
-#color-panel.open{transform:translateY(0) scale(1);opacity:1;pointer-events:all;}
-#color-panel h4{font-size:12px;font-weight:800;color:#455a64;margin-bottom:10px;}
-#color-swatches{display:flex;flex-wrap:wrap;gap:8px;}
-.cswatch{width:30px;height:30px;border-radius:50%;cursor:pointer;
-  border:3px solid transparent;transition:transform .15s;flex-shrink:0;}
-.cswatch:active{transform:scale(0.88);}
-.cswatch.active{border-color:#37474f;transform:scale(1.18);}
-#custom-row{display:flex;align-items:center;gap:8px;margin-top:10px;
-  font-size:11px;font-weight:700;color:#546e7a;}
-#color-picker-inp{width:28px;height:28px;border-radius:50%;border:none;padding:0;cursor:pointer;
-  -webkit-appearance:none;overflow:hidden;}
-#color-picker-inp::-webkit-color-swatch-wrapper{padding:0;}
-#color-picker-inp::-webkit-color-swatch{border:none;border-radius:50%;}
+    .drop:active {
+      transform: scale(.985);
+    }
 
-/* 데이 패널 */
-#dpanel{
-  position:fixed;bottom:0;left:0;right:0;z-index:300;
-  height:43vh;background:#fff;border-radius:22px 22px 0 0;
-  box-shadow:0 -4px 28px rgba(0,0,0,.18);
-  transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);
-  display:flex;flex-direction:column;
-  padding-bottom:env(safe-area-inset-bottom,0px);
-}
-#dpanel.open{transform:translateY(0);}
-#dp-handle{width:38px;height:4px;border-radius:2px;background:#e0e0e0;margin:10px auto 4px;flex-shrink:0;}
-#dp-head{padding:0 16px 6px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-#dp-date{font-size:15px;font-weight:800;color:#202124;}
-#dp-close{border:none;background:none;font-size:24px;color:#b0bec5;cursor:pointer;line-height:1;padding:2px 6px;}
-#dp-cards{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;
-  gap:10px;padding:4px 16px;scrollbar-width:none;}
-#dp-cards::-webkit-scrollbar{display:none;}
-.dcard{flex-shrink:0;width:96px;background:#f8f9fa;border-radius:16px;
-  padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;
-  border-top:4px solid var(--cc,#b0bec5);position:relative;transition:opacity .2s;}
-.dcard.done{opacity:.4;}
-.dcard-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;letter-spacing:-.2px;}
-.dcard-title{font-size:11px;font-weight:700;color:#37474f;text-align:center;word-break:break-all;line-height:1.3;flex:1;}
-.dcard-time{font-size:10px;color:#90a4ae;font-weight:600;}
-.dcard-chk{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;
-  border:2px solid #cfd8dc;background:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;color:transparent;font-size:10px;font-weight:700;transition:all .15s;}
-.dcard-chk.on{background:var(--cc);border-color:var(--cc);color:#fff;}
-.dcard-empty{flex-shrink:0;width:160px;border-radius:16px;background:#f8f9fa;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:6px;padding:16px;color:#b0bec5;font-size:12px;font-weight:600;text-align:center;}
-#dp-add{display:flex;gap:8px;padding:8px 12px 10px;flex-shrink:0;border-top:1px solid #f1f3f4;}
-#dp-inp{flex:1;border:2px solid #e8eaed;border-radius:14px;
-  padding:9px 12px;font-size:14px;font-family:inherit;outline:none;color:#37474f;background:#f8f9fa;}
-#dp-inp:focus{border-color:#4285F4;background:#fff;}
-#dp-inp::-webkit-search-cancel-button{display:none;}
-#dp-addbtn{width:40px;height:40px;border-radius:50%;border:none;flex-shrink:0;
-  background:#4285F4;color:#fff;font-size:22px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(66,133,244,.35);}
+    @keyframes breathe {
+      0%, 100% { scale: 1; }
+      50% { scale: .972; }
+    }
 
-/* 시트 */
-#sheet{
-  position:fixed;bottom:0;left:0;right:0;z-index:400;
-  background:#fff;border-radius:22px 22px 0 0;
-  box-shadow:0 -8px 40px rgba(0,0,0,.32);
-  transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);
-  max-height:72vh;display:flex;flex-direction:column;
-  padding-bottom:env(safe-area-inset-bottom,0px);
-}
-#sheet.open{transform:translateY(0);}
-#sh-handle{width:38px;height:4px;border-radius:2px;background:#e0e0e0;margin:10px auto 0;flex-shrink:0;}
-#sh-head{padding:10px 16px 6px;font-size:15px;font-weight:800;color:#37474f;
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-#sh-close{border:none;background:none;font-size:24px;color:#b0bec5;cursor:pointer;line-height:1;padding:2px 4px;}
-#add-row{display:flex;gap:8px;padding:4px 12px 8px;flex-shrink:0;}
-#add-inp{flex:1;border:2px solid #e8eaed;border-radius:14px;
-  padding:10px 13px;font-size:14px;font-family:inherit;outline:none;color:#37474f;background:#f8f9fa;}
-#add-inp:focus{border-color:#29b6f6;background:#fff;}
-#add-inp::-webkit-search-cancel-button{display:none;}
-#add-btn{width:42px;height:42px;border-radius:50%;border:none;flex-shrink:0;
-  background:linear-gradient(135deg,#0288d1,#26c6da);color:#fff;
-  font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 2px 8px rgba(2,136,209,.4);}
-#cat-opts{display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
-#cat-opts::-webkit-scrollbar{display:none;}
-.copt{border:2px solid transparent;border-radius:10px;padding:5px 12px;
-  font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;
-  background:#f0f0f0;color:#78909c;white-space:nowrap;flex-shrink:0;}
-.copt.sel{color:#fff;}
-#sh-tasks{overflow-y:auto;flex:1;padding:0 12px 16px;display:flex;flex-direction:column;gap:8px;}
-.trow{display:flex;align-items:center;gap:9px;background:#f8f9fa;border-radius:14px;
-  padding:10px 12px;border-left:5px solid var(--cc,#b0bec5);}
-.trow.done{opacity:.45;}
-.tchk{width:26px;height:26px;border:2.5px solid #cfd8dc;border-radius:50%;
-  background:none;cursor:pointer;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;color:transparent;transition:all .15s;}
-.tchk.on{background:var(--cc,#039be5);border-color:var(--cc);color:#fff;}
-.tinfo{flex:1;min-width:0;}
-.ttitle{font-size:14px;font-weight:600;color:#37474f;}
-.ttime{font-size:12px;color:#90a4ae;margin-top:2px;}
-.tdel{border:none;background:none;color:#cfd8dc;cursor:pointer;padding:4px;font-size:20px;line-height:1;}
+    /* ── 기쁨: 통통 ── */
+    .drop.happy {
+      animation: happy-bounce 0.7s cubic-bezier(.36,.07,.19,.97) 2;
+    }
+    @keyframes happy-bounce {
+      0%   { transform: translateY(0)    scaleX(1)    scaleY(1); }
+      18%  { transform: translateY(-22%) scaleX(0.95) scaleY(1.05); }
+      36%  { transform: translateY(0)    scaleX(1.08) scaleY(0.93); }
+      54%  { transform: translateY(-12%) scaleX(0.97) scaleY(1.03); }
+      72%  { transform: translateY(0)    scaleX(1.04) scaleY(0.97); }
+      86%  { transform: translateY(-5%)  scaleX(1)    scaleY(1); }
+      100% { transform: translateY(0)    scaleX(1)    scaleY(1); }
+    }
 
+    /* ── 슬픔: 흘러내리기 ── */
+    .drop.sad {
+      animation: sad-droop 2.8s ease-in-out infinite;
+    }
+    @keyframes sad-droop {
+      0%, 100% { transform: scaleX(1)    scaleY(1)    translateY(0); }
+      40%      { transform: scaleX(0.88) scaleY(1.14) translateY(5%); }
+      70%      { transform: scaleX(0.90) scaleY(1.10) translateY(4%); }
+    }
 
-/* 토스트 */
-#toast{position:fixed;bottom:24px;left:50%;
-  transform:translateX(-50%) translateY(20px);
-  background:#37474f;color:#fff;border-radius:20px;
-  padding:9px 18px;font-size:13px;font-weight:700;
-  z-index:600;opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap;pointer-events:none;}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-</style>
+    /* ── 화남: 뾰족뾰족 + 떨림 ── */
+    .drop.angry {
+      filter: url(#f-angry);
+      animation: angry-shake 0.12s ease-in-out infinite;
+      overflow: visible; /* 뾰족한 부분이 원 밖으로 나오게 */
+    }
+    @keyframes angry-shake {
+      0%, 100% { transform: translateX(0); }
+      30%      { transform: translateX(-4px) rotate(-1deg); }
+      70%      { transform: translateX( 4px) rotate( 1deg); }
+    }
+
+    .drop {
+      overflow: hidden;
+    }
+
+    .drop video,
+    .drop img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.42);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .sr-status {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* 듣는 중 글로우 */
+    .drop-zone.listening .drop {
+      box-shadow:
+        0 0 8px 3px rgba(120, 200, 255, 0.70),
+        0 0 18px 6px rgba(100, 170, 255, 0.35);
+      animation: breathe 5.2s ease-in-out infinite, glow-pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes glow-pulse {
+      0%, 100% { box-shadow: 0 0 8px 3px rgba(120,200,255,0.70), 0 0 18px 6px rgba(100,170,255,0.35); }
+      50%       { box-shadow: 0 0 14px 5px rgba(120,200,255,0.95), 0 0 26px 9px rgba(100,170,255,0.55); }
+    }
+
+    @media (max-width: 480px) {
+      .drop-zone {
+        width: min(68vw, 246px);
+      }
+    }
+  </style>
 </head>
 <body>
-
-<!-- 하늘 배경 -->
-<canvas id="sky"></canvas>
-
-<!-- 블롭 + 중앙 정보 -->
-<svg id="blob-svg" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <!-- 물방울 메인 채색: 반투명 중심 → 가장자리 색감 -->
-    <radialGradient id="blob-grad" cx="40%" cy="34%" r="72%">
-      <stop id="grad-c" offset="0%"   stop-color="rgba(255,255,255,0.06)"/>
-      <stop id="grad-m" offset="42%"  stop-color="#7C4DFF" stop-opacity="0.22"/>
-      <stop id="grad-e" offset="100%" stop-color="#4a1f9e" stop-opacity="0.90"/>
-    </radialGradient>
-    <!-- 하단 내부 그림자 (userSpaceOnUse로 mainLoop에서 위치 갱신) -->
-    <radialGradient id="inner-bottom-grad" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1">
-      <stop offset="0%"   stop-color="rgba(0,0,0,0.38)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-    </radialGradient>
-    <!-- 큰 상단 반사광 -->
-    <radialGradient id="hl-grad" cx="34%" cy="24%" r="50%">
-      <stop offset="0%"   stop-color="rgba(255,255,255,0.90)"/>
-      <stop offset="45%"  stop-color="rgba(255,255,255,0.30)"/>
-      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-    </radialGradient>
-    <!-- 바닥 그림자 -->
-    <radialGradient id="drop-grad" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="rgba(0,0,0,0.18)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-    </radialGradient>
-    <!-- 테두리 darkening 필터 -->
-    <filter id="rim-f" x="-5%" y="-5%" width="110%" height="110%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
-    </filter>
-
-  </defs>
-  <!-- 바닥 드롭 섀도 -->
-  <ellipse id="blob-drop" fill="url(#drop-grad)" pointer-events="none"/>
-  <!-- 연필 소묘 물방울 몸통 (grainy texture 필터 적용) -->
-  <path id="blob-path" fill="url(#blob-grad)" filter="url(#pencil-tex)" cursor="pointer"/>
-  <!-- 오른쪽 하단 어두운 해칭 그림자 -->
-  <path id="pencil-dark" fill="url(#pencil-shadow)" pointer-events="none"/>
-  <!-- 상단 반사광 영역 -->
-  <path id="blob-hl" fill="url(#hl-grad)" pointer-events="none"/>
-  <!-- 두 개의 직사각 반사 하이라이트 (소묘 이미지 특징) -->
-  <rect id="blob-spec1" fill="rgba(255,255,255,0.92)" rx="2" pointer-events="none"/>
-  <rect id="blob-spec2" fill="rgba(255,255,255,0.70)" rx="1.5" pointer-events="none"/>
-  <!-- (글로우 비활성) -->
-  <path id="blob-glow" opacity="0" style="display:none"/>
-  <!-- 얼굴 -->
-  <g id="blob-face" pointer-events="none">
-    <!-- 눈썹 -->
-    <path id="face-brow-l" fill="none" stroke-linecap="round"/>
-    <path id="face-brow-r" fill="none" stroke-linecap="round"/>
-    <!-- 평소: ∪ 눈 -->
-    <path id="face-eye-l" fill="none" stroke-linecap="round"/>
-    <path id="face-eye-r" fill="none" stroke-linecap="round"/>
-    <!-- 듣기/브리핑: 동그란 눈 -->
-    <ellipse id="face-circ-l" fill="white" opacity="0"/>
-    <ellipse id="face-circ-r" fill="white" opacity="0"/>
-    <ellipse id="face-pupil-l" fill="#2a1560" opacity="0"/>
-    <ellipse id="face-pupil-r" fill="#2a1560" opacity="0"/>
-    <ellipse id="face-shine-l" fill="white" opacity="0"/>
-    <ellipse id="face-shine-r" fill="white" opacity="0"/>
-    <!-- 볼터치 -->
-    <ellipse id="face-cheek-l" fill="rgba(255,160,160,0.22)"/>
-    <ellipse id="face-cheek-r" fill="rgba(255,160,160,0.22)"/>
-    <!-- 입 -->
-    <path id="face-mouth" stroke-linecap="round"/>
-  </g>
-</svg>
-
-<!-- 음성 듣는 중 링 애니메이션 -->
-<div id="listen-ring"></div>
-
-<div id="blob-info">
-  <div id="bi-date"></div>
-  <div id="bi-count"></div>
-  <div id="bi-sub"></div>
-  <div id="bi-hint">탭하여 말하기</div>
-</div>
-
-<!-- 상단바 -->
-<div id="topbar">
-  <div id="date-label"></div>
-  <button class="tbtn" id="btn-color" aria-label="색상 설정">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5S18.33 11 17.5 11z"/>
-    </svg>
-  </button>
-</div>
-
-<!-- 색상 패널 -->
-<div id="color-panel">
-  <h4>블롭 색상 선택</h4>
-  <div id="color-swatches"></div>
-  <div id="custom-row">
-    <span>직접 선택</span>
-    <input type="color" id="color-picker-inp">
-  </div>
-</div>
-
-<!-- 데이 패널 -->
-<div id="dpanel">
-  <div id="dp-handle"></div>
-  <div id="dp-head">
-    <div id="dp-date"></div>
-    <button id="dp-close" aria-label="닫기">×</button>
-  </div>
-  <div id="dp-cards"></div>
-  <div id="dp-add">
-    <input id="dp-inp" type="search" placeholder="할 일 추가…" autocomplete="off" spellcheck="false">
-    <button id="dp-addbtn" aria-label="추가">+</button>
-  </div>
-</div>
-
-<!-- 일정 시트 -->
-<div id="sheet">
-  <div id="sh-handle"></div>
-  <div id="sh-head">
-    <span id="sh-title">일정</span>
-    <button id="sh-close" aria-label="닫기">×</button>
-  </div>
-  <div id="cat-opts"></div>
-  <div id="add-row">
-    <input id="add-inp" type="search" placeholder="할 일 입력…" autocomplete="off" spellcheck="false">
-    <button id="add-btn" aria-label="추가">+</button>
-  </div>
-  <div id="sh-tasks"></div>
-</div>
-
-
-<div id="toast"></div>
-
-<script>
-// ── 상수 ──────────────────────────────────────────────────────
-const CATS = {
-  school:{ label:'학교', color:'#4285F4', bg:'rgba(66,133,244,.28)' },
-  manage:{ label:'관리', color:'#EA4335', bg:'rgba(234,67,53,.28)' },
-  home:  { label:'집',   color:'#34A853', bg:'rgba(52,168,83,.28)' },
-  other: { label:'기타', color:'#FBBC04', bg:'rgba(251,188,4,.28)' }
-};
-const CAT_ORDER = ['school','manage','home','other'];
-const KR_DAYS   = ['월','화','수','목','금','토','일'];
-const KR_NUMS   = {한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10,열한:11,열두:12};
-const PRESETS   = ['#7C4DFF','#E91E63','#FF6D00','#00BCD4','#43A047','#F44336','#1E88E5','#FF8F00'];
-
-// 시간대별 하늘 색상 키프레임
-const SKY_FRAMES = [
-  { h:0,  top:'#020412', bot:'#0d1b3e' },
-  { h:5,  top:'#1a237e', bot:'#4527a0' },
-  { h:6,  top:'#bf360c', bot:'#ff8f00' },
-  { h:7,  top:'#0277bd', bot:'#b3e5fc' },
-  { h:12, top:'#01579b', bot:'#81d4fa' },
-  { h:17, top:'#e64a19', bot:'#ff6f00' },
-  { h:18, top:'#6a1b9a', bot:'#c2185b' },
-  { h:20, top:'#050514', bot:'#0a0a2e' },
-  { h:24, top:'#020412', bot:'#0d1b3e' },
-];
-
-// ── 유틸 ──────────────────────────────────────────────────────
-const p2 = n => String(n).padStart(2,'0');
-const dateKey = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
-const today0  = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
-const loadPlan = k => { try{return JSON.parse(localStorage.getItem('dp2_'+k)||'{"tasks":[]}')}catch{return{tasks:[]}} };
-const savePlan = (k,p) => { localStorage.setItem('dp2_'+k,JSON.stringify(p)); updateBlobInfo(); };
-const genId    = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-function lerpColor(a, b, t) {
-  const ah=a.replace('#',''), bh=b.replace('#','');
-  const r=(c,s)=>parseInt(c.slice(s,s+2),16);
-  const mix=(x,y)=>Math.round(x+(y-x)*t).toString(16).padStart(2,'0');
-  return '#'+mix(r(ah,0),r(bh,0))+mix(r(ah,2),r(bh,2))+mix(r(ah,4),r(bh,4));
-}
-
-// ── 이번 주 7일 ───────────────────────────────────────────────
-function getThisWeek() {
-  const t = today0(), dow = t.getDay();
-  const mon = new Date(t);
-  mon.setDate(t.getDate() - (dow===0?6:dow-1));
-  return Array.from({length:7}, (_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
-}
-
-// ── 블롭 색상 ─────────────────────────────────────────────────
-let blobColor = localStorage.getItem('dp2_blobColor') || '#7C4DFF';
-
-function lightenColor(hex, f) {
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  const mix=v=>Math.round(v+(255-v)*f).toString(16).padStart(2,'0');
-  return '#'+mix(r)+mix(g)+mix(b);
-}
-function darkenColor(hex, f) {
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  const mix=v=>Math.round(v*(1-f)).toString(16).padStart(2,'0');
-  return '#'+mix(r)+mix(g)+mix(b);
-}
-function applyBlobColor(c) {
-  blobColor = c;
-  localStorage.setItem('dp2_blobColor', c);
-  // 연필 소묘 스타일: 그레이스케일 유지 (색 변경 안 함)
-}
-
-// ── 하늘 캔버스 ───────────────────────────────────────────────
-const skyCvs = document.getElementById('sky');
-const skyCtx = skyCvs.getContext('2d');
-let stars = [];
-
-function initStars() {
-  stars = Array.from({length:220}, () => ({
-    x: Math.random(), y: Math.random() * 0.72,
-    r: Math.random()*1.4+0.3,
-    phase: Math.random()*Math.PI*2,
-    spd: Math.random()*0.6+0.2
-  }));
-}
-
-function getSkyColors(hour, min) {
-  const t = hour + min/60;
-  let k0 = SKY_FRAMES[0], k1 = SKY_FRAMES[SKY_FRAMES.length-1];
-  for (let i=0; i<SKY_FRAMES.length-1; i++) {
-    if (t >= SKY_FRAMES[i].h && t < SKY_FRAMES[i+1].h) {
-      k0=SKY_FRAMES[i]; k1=SKY_FRAMES[i+1]; break;
-    }
-  }
-  const p = (t-k0.h)/(k1.h-k0.h);
-  return { top:lerpColor(k0.top,k1.top,p), bot:lerpColor(k0.bot,k1.bot,p),
-    showStars: hour>=19||hour<7 };
-}
-
-function resizeSky() {
-  skyCvs.width  = window.innerWidth;
-  skyCvs.height = window.innerHeight;
-}
-
-function drawSky(ts) {
-  const w=skyCvs.width, h=skyCvs.height;
-  const d=new Date();
-  const {top,bot,showStars}=getSkyColors(d.getHours(),d.getMinutes());
-  const g=skyCtx.createLinearGradient(0,0,0,h);
-  g.addColorStop(0,top); g.addColorStop(1,bot);
-  skyCtx.fillStyle=g; skyCtx.fillRect(0,0,w,h);
-
-  if (showStars) {
-    const t = ts/1000;
-    stars.forEach(s => {
-      const op = 0.35+0.55*Math.sin(t*s.spd+s.phase);
-      skyCtx.beginPath();
-      skyCtx.arc(s.x*w, s.y*h, s.r, 0, Math.PI*2);
-      skyCtx.fillStyle=`rgba(255,255,255,${op.toFixed(2)})`;
-      skyCtx.fill();
-    });
-  }
-}
-
-// ── 블롭 애니메이션 ───────────────────────────────────────────
-const blobPathEl = document.getElementById('blob-path');
-const blobGlowEl = document.getElementById('blob-glow');
-const blobHlEl   = document.getElementById('blob-hl');
-const blobInfoEl = document.getElementById('blob-info');
-
-function getMetrics() {
-  const cx=window.innerWidth/2, cy=window.innerHeight/2;
-  const base=Math.min(window.innerWidth,window.innerHeight);
-  return {
-    cx, cy,
-    R: base*0.28,
-  };
-}
-
-function catmullPath(pts) {
-  const n=pts.length;
-  let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-  for (let i=0; i<n; i++) {
-    const p0=pts[(i-1+n)%n], p1=pts[i], p2=pts[(i+1)%n], p3=pts[(i+2)%n];
-    const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
-    const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
-    d+=` C${c1x.toFixed(1)} ${c1y.toFixed(1)},${c2x.toFixed(1)} ${c2y.toFixed(1)},${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-  }
-  return d+'Z';
-}
-
-let blobState = 'idle'; // 'idle' | 'listening' | 'briefing'
-
-function blobD(cx, cy, R, t) {
-  const N=8, pts=[];
-  const isL = blobState==='listening';
-  const isB = blobState==='briefing';
-  const amp  = isL ? 0.10 : isB ? 0.032 : 0.055;
-  const spd  = isL ? 1.75 : isB ? 0.55  : 1.0;
-  const pulse = 1 + (isL?0.042:isB?0.012:0.022)*Math.sin(t*(isL?1.1:isB?0.28:0.42));
-  for (let i=0; i<N; i++) {
-    const a=(i/N)*Math.PI*2 - Math.PI/2;
-    const dr=R*(
-      amp*Math.sin(t*0.38*spd+i*1.15)+
-      amp*0.5*Math.sin(t*0.72*spd+i*2.40)
-    );
-    const r=(R+dr)*pulse;
-    pts.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r]);
-  }
-  return catmullPath(pts);
-}
-
-function mainLoop(ts) {
-  const t = ts/1000;
-  const {cx,cy,R} = getMetrics();
-  const d = blobD(cx,cy,R,t);
-  blobPathEl.setAttribute('d',d);
-  blobGlowEl.setAttribute('d',d);
-  // 반사광 영역 (blob과 동일 형태)
-  blobHlEl.setAttribute('d',d);
-  // 오른쪽 하단 어두운 해칭 그림자도 같은 형태
-  document.getElementById('pencil-dark').setAttribute('d',d);
-  // pencil-shadow 그라디언트: 오른쪽 하단에 위치
-  const psg = document.getElementById('pencil-shadow');
-  psg.setAttribute('cx', cx+R*0.28); psg.setAttribute('cy', cy+R*0.32); psg.setAttribute('r', R*0.82);
-  // 드롭 섀도 (블롭 아래 타원)
-  const drop = document.getElementById('blob-drop');
-  drop.setAttribute('cx', cx+R*0.08); drop.setAttribute('cy', cy+R*0.90);
-  drop.setAttribute('rx', R*0.68); drop.setAttribute('ry', R*0.13);
-  // 직사각 하이라이트 두 개 (소묘 이미지의 흰 반사점)
-  const s1 = document.getElementById('blob-spec1');
-  s1.setAttribute('x', cx-R*0.32); s1.setAttribute('y', cy-R*0.30);
-  s1.setAttribute('width', R*0.14); s1.setAttribute('height', R*0.07);
-  const s2 = document.getElementById('blob-spec2');
-  s2.setAttribute('x', cx-R*0.20); s2.setAttribute('y', cy-R*0.20);
-  s2.setAttribute('width', R*0.09); s2.setAttribute('height', R*0.05);
-  blobInfoEl.style.left = cx+'px';
-  blobInfoEl.style.top  = cy+'px';
-  updateFace(cx, cy, R);
-  // 듣는 중 링 위치
-  const ring = document.getElementById('listen-ring');
-  if(blobState==='listening'){
-    ring.style.left=cx+'px'; ring.style.top=cy+'px';
-    ring.style.width=(R*2.1)+'px'; ring.style.height=(R*2.1)+'px';
-  }
-  requestAnimationFrame(mainLoop);
-}
-
-// ── 얼굴 ──────────────────────────────────────────────────────
-function setFA(id, attrs) {
-  const el = document.getElementById(id);
-  if(el) Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, String(v)));
-}
-
-function updateFace(cx, cy, R) {
-  const idle = blobState==='idle';
-  const listen = blobState==='listening';
-  const brief = blobState==='briefing';
-  const ey = cy - R*0.09;
-  const ex=R*0.22, ew=R*0.13, eh=R*0.10, sw=R*0.030;
-  const brCol='rgba(255,255,255,0.88)', brSw=sw*0.82;
-  const bry=ey-R*0.135, bew=ew*1.05;
-
-  // ── 눈썹 ──
-  if(listen) {
-    // 미간 찌푸림 — 집중
-    setFA('face-brow-l',{d:`M${cx-ex-bew*0.65},${bry-R*0.022} Q${cx-ex-bew*0.05},${bry+R*0.018} ${cx-ex+bew*0.55},${bry+R*0.008}`,stroke:brCol,'stroke-width':brSw,fill:'none'});
-    setFA('face-brow-r',{d:`M${cx+ex-bew*0.55},${bry+R*0.008} Q${cx+ex+bew*0.05},${bry+R*0.018} ${cx+ex+bew*0.65},${bry-R*0.022}`,stroke:brCol,'stroke-width':brSw,fill:'none'});
-  } else if(brief) {
-    // 완만한 아치 — 정중함
-    const bd=R*0.032;
-    setFA('face-brow-l',{d:`M${cx-ex-bew*0.65},${bry+bd*0.4} Q${cx-ex},${bry-bd} ${cx-ex+bew*0.65},${bry+bd*0.4}`,stroke:brCol,'stroke-width':brSw,fill:'none'});
-    setFA('face-brow-r',{d:`M${cx+ex-bew*0.65},${bry+bd*0.4} Q${cx+ex},${bry-bd} ${cx+ex+bew*0.65},${bry+bd*0.4}`,stroke:brCol,'stroke-width':brSw,fill:'none'});
-  } else {
-    // idle — 눈썹 없음
-    setFA('face-brow-l',{d:'M0,0',stroke:'none',fill:'none'});
-    setFA('face-brow-r',{d:'M0,0',stroke:'none',fill:'none'});
-  }
-
-  // ── 눈 ──
-  if(idle) {
-    // ∪ 반달 눈 — 반갑고 따뜻
-    setFA('face-eye-l',{d:`M${cx-ex-ew},${ey} Q${cx-ex},${ey+eh*1.3} ${cx-ex+ew},${ey}`,'stroke':'rgba(255,255,255,0.92)','stroke-width':sw*1.1,fill:'none'});
-    setFA('face-eye-r',{d:`M${cx+ex-ew},${ey} Q${cx+ex},${ey+eh*1.3} ${cx+ex+ew},${ey}`,'stroke':'rgba(255,255,255,0.92)','stroke-width':sw*1.1,fill:'none'});
-    ['face-circ-l','face-circ-r','face-pupil-l','face-pupil-r','face-shine-l','face-shine-r'].forEach(id=>setFA(id,{opacity:0}));
-  } else if(listen) {
-    // 살짝 가늘어진 눈 — 열중, 집중
-    setFA('face-eye-l',{d:'M0,0',stroke:'none',fill:'none'});
-    setFA('face-eye-r',{d:'M0,0',stroke:'none',fill:'none'});
-    const cw=ew*0.88, ch=eh*0.66;
-    setFA('face-circ-l',{cx:cx-ex,cy:ey,rx:cw,ry:ch,fill:'white',opacity:1});
-    setFA('face-circ-r',{cx:cx+ex,cy:ey,rx:cw,ry:ch,fill:'white',opacity:1});
-    const pw=cw*0.52, ph=ch*0.78;
-    // 동공 약간 안쪽으로 (상대를 바라보는 느낌)
-    setFA('face-pupil-l',{cx:cx-ex+cw*0.06,cy:ey+ch*0.06,rx:pw,ry:ph,fill:'#1a0a40',opacity:1});
-    setFA('face-pupil-r',{cx:cx+ex-cw*0.06,cy:ey+ch*0.06,rx:pw,ry:ph,fill:'#1a0a40',opacity:1});
-    setFA('face-shine-l',{cx:cx-ex-pw*0.18,cy:ey-ph*0.25,rx:pw*0.34,ry:ph*0.34,opacity:1});
-    setFA('face-shine-r',{cx:cx+ex-pw*0.18,cy:ey-ph*0.25,rx:pw*0.34,ry:ph*0.34,opacity:1});
-  } else {
-    // 브리핑 — 단정하고 진지한 눈
-    setFA('face-eye-l',{d:'M0,0',stroke:'none',fill:'none'});
-    setFA('face-eye-r',{d:'M0,0',stroke:'none',fill:'none'});
-    const cw=ew*0.82, ch=eh*0.60;
-    setFA('face-circ-l',{cx:cx-ex,cy:ey,rx:cw,ry:ch,fill:'white',opacity:1});
-    setFA('face-circ-r',{cx:cx+ex,cy:ey,rx:cw,ry:ch,fill:'white',opacity:1});
-    const pw=cw*0.50, ph=ch*0.80;
-    // 동공 살짝 아래 — 차분한 시선
-    setFA('face-pupil-l',{cx:cx-ex,cy:ey+ch*0.14,rx:pw,ry:ph,fill:'#1a0a40',opacity:1});
-    setFA('face-pupil-r',{cx:cx+ex,cy:ey+ch*0.14,rx:pw,ry:ph,fill:'#1a0a40',opacity:1});
-    setFA('face-shine-l',{cx:cx-ex-pw*0.18,cy:ey-ph*0.18,rx:pw*0.30,ry:ph*0.30,opacity:1});
-    setFA('face-shine-r',{cx:cx+ex-pw*0.18,cy:ey-ph*0.18,rx:pw*0.30,ry:ph*0.30,opacity:1});
-  }
-
-  // ── 볼터치 (idle만) ──
-  setFA('face-cheek-l',{cx:cx-ex*1.62,cy:ey+R*0.16,rx:R*0.11,ry:R*0.046,opacity:idle?1:0});
-  setFA('face-cheek-r',{cx:cx+ex*1.62,cy:ey+R*0.16,rx:R*0.11,ry:R*0.046,opacity:idle?1:0});
-
-  // ── 입 ──
-  const my=cy+R*0.22, mEl=document.getElementById('face-mouth');
-  if(idle) {
-    // 활짝 미소
-    const mr=R*0.18, md=R*0.075;
-    mEl.setAttribute('d',`M${cx-mr},${my} Q${cx},${my+md} ${cx+mr},${my}`);
-    mEl.setAttribute('fill','none');
-    mEl.setAttribute('stroke','rgba(255,255,255,0.92)');
-    mEl.setAttribute('stroke-width',sw*1.1);
-  } else if(listen) {
-    // 살짝 벌린 입 — 집중해서 듣는 중
-    const mr=R*0.085, mh=R*0.058;
-    mEl.setAttribute('d',`M${cx-mr},${my} a${mr},${mh},0,0,1,${mr*2},0 a${mr},${mh},0,0,1,${-mr*2},0`);
-    mEl.setAttribute('fill','rgba(20,5,50,0.42)');
-    mEl.setAttribute('stroke','rgba(255,255,255,0.38)');
-    mEl.setAttribute('stroke-width',sw*0.6);
-  } else {
-    // 정중한 미소 — 절제된 얇은 곡선
-    const mr=R*0.13, md=R*0.022;
-    mEl.setAttribute('d',`M${cx-mr},${my} Q${cx},${my+md} ${cx+mr},${my}`);
-    mEl.setAttribute('fill','none');
-    mEl.setAttribute('stroke','rgba(255,255,255,0.72)');
-    mEl.setAttribute('stroke-width',sw*0.72);
-  }
-}
-
-// ── 블롭 중앙 정보 ────────────────────────────────────────────
-function updateBlobInfo() {
-  const dk=dateKey(today0()), tasks=loadPlan(dk).tasks||[];
-  const total=tasks.length, done=tasks.filter(t=>t.done).length, remain=total-done;
-  document.getElementById('bi-date').textContent=
-    new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
-  if (!total) {
-    document.getElementById('bi-count').textContent='';
-    document.getElementById('bi-sub').textContent='오늘 일정이 없어요';
-  } else {
-    document.getElementById('bi-count').textContent=remain+'개';
-    document.getElementById('bi-sub').textContent=`${done}/${total} 완료`;
-  }
-}
-
-let selDate=dateKey(today0());
-
-// ── 색상 패널 ─────────────────────────────────────────────────
-function initColorPanel() {
-  const wrap=document.getElementById('color-swatches');
-  PRESETS.forEach(c=>{
-    const b=document.createElement('div');
-    b.className='cswatch'+(c===blobColor?' active':'');
-    b.style.background=c;
-    b.onclick=()=>{
-      applyBlobColor(c);
-      document.getElementById('color-picker-inp').value=c;
-      wrap.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-    };
-    wrap.appendChild(b);
-  });
-  const inp=document.getElementById('color-picker-inp');
-  inp.value=blobColor;
-  inp.addEventListener('input',e=>{
-    applyBlobColor(e.target.value);
-    wrap.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('active'));
-  });
-}
-
-let colorOpen=false;
-document.getElementById('btn-color').onclick=e=>{
-  e.stopPropagation();
-  colorOpen=!colorOpen;
-  document.getElementById('color-panel').classList.toggle('open',colorOpen);
-};
-document.getElementById('color-panel').onclick=e=>e.stopPropagation();
-
-// ── 데이 패널 ─────────────────────────────────────────────────
-let dpDk=null;
-const dpanel=document.getElementById('dpanel');
-
-function openDayPanel(dk) {
-  dpDk=dk;
-  const d=new Date(dk+'T00:00:00');
-  document.getElementById('dp-date').textContent=
-    d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
-  renderDayPanel(dk);
-  dpanel.classList.add('open');
-  const n=(loadPlan(dk).tasks||[]).filter(t=>!t.done).length;
-  speak(n?`${d.toLocaleDateString('ko-KR',{month:'long',day:'numeric'})}, 할 일 ${n}가지`
-       :`${d.toLocaleDateString('ko-KR',{month:'long',day:'numeric'})}, 할 일이 없어요`);
-}
-
-function closeDayPanel() {
-  dpanel.classList.remove('open');
-  dpDk=null; selDate=dateKey(today0());
-}
-
-function renderDayPanel(dk) {
-  const cards=document.getElementById('dp-cards');
-  const plan=loadPlan(dk), tasks=plan.tasks||[];
-  if (!tasks.length) {
-    cards.innerHTML=`<div class="dcard-empty"><span style="font-size:32px">📝</span><div>할 일이 없어요</div><div style="font-size:11px;color:#ccc">아래에서 추가해보세요</div></div>`;
-    return;
-  }
-  cards.innerHTML=tasks.map(t=>{
-    const ci=CATS[t.category||'other'];
-    return `<div class="dcard${t.done?' done':''}" style="--cc:${ci.color}">
-      <button class="dcard-chk${t.done?' on':''}" data-tid="${esc(t.id)}">${t.done?'✓':''}</button>
-      <div class="dcard-icon" style="background:${ci.color}22;color:${ci.color}">${ci.label}</div>
-      <div class="dcard-title">${esc(t.title)}</div>
-      ${t.time?`<div class="dcard-time">${t.time}</div>`:''}
-    </div>`;
-  }).join('');
-  cards.querySelectorAll('.dcard-chk').forEach(b=>{
-    b.onclick=()=>{
-      const t=plan.tasks.find(x=>x.id===b.dataset.tid);
-      if(t){t.done=!t.done;savePlan(dk,plan);renderDayPanel(dk);
-        speak(t.done?`${t.title} 완료했어요`:`${t.title} 다시 열었어요`);}
-    };
-  });
-}
-
-// ── 하단 시트 ─────────────────────────────────────────────────
-const sheet=document.getElementById('sheet');
-let selCat='other';
-
-function openSheet(dk) {
-  closeDayPanel();
-  const d=new Date(dk+'T00:00:00');
-  document.getElementById('sh-title').textContent=
-    d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
-  buildCatOpts(); renderSheet(dk); sheet.classList.add('open');
-  const n=(loadPlan(dk).tasks||[]).filter(t=>!t.done).length;
-  speak(n?`${d.toLocaleDateString('ko-KR',{month:'long',day:'numeric'})}, 할 일 ${n}가지`
-       :`${d.toLocaleDateString('ko-KR',{month:'long',day:'numeric'})}, 할 일이 없어요`);
-}
-
-function closeSheet(){ sheet.classList.remove('open'); }
-
-function buildCatOpts() {
-  const wrap=document.getElementById('cat-opts'); wrap.innerHTML='';
-  CAT_ORDER.forEach(k=>{
-    const b=document.createElement('button');
-    b.className='copt'+(selCat===k?' sel':'');
-    b.textContent=CATS[k].label;
-    b.style.borderColor=CATS[k].color;
-    if(selCat===k) b.style.background=CATS[k].color;
-    b.onclick=()=>{ selCat=k; buildCatOpts(); };
-    wrap.appendChild(b);
-  });
-}
-
-function renderSheet(dk) {
-  const el=document.getElementById('sh-tasks');
-  const plan=loadPlan(dk), tasks=plan.tasks||[];
-  if (!tasks.length) {
-    el.innerHTML=`<div style="text-align:center;padding:28px;color:#b0bec5;font-size:14px">할 일이 없어요<br><span style="font-size:12px">아래에서 추가하거나 음성으로 말해보세요</span></div>`;
-    return;
-  }
-  el.innerHTML=tasks.map(t=>{
-    const ci=CATS[t.category||'other'];
-    return `<div class="trow${t.done?' done':''}" style="--cc:${ci.color}">
-      <button class="tchk${t.done?' on':''}" data-tid="${t.id}">
-        ${t.done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>':''}
+  <!-- 화남 뾰족 필터 -->
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden;">
+    <defs>
+      <filter id="f-angry" x="-25%" y="-25%" width="150%" height="150%">
+        <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="3" seed="8" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+  <main class="room">
+    <section class="drop-zone" id="dropZone" aria-label="물방울 매니저">
+      <button class="drop" id="drop" aria-label="물방울을 눌러 일정 말하기">
+        <video src="흰 배경에 완벽하게 동그란 아주 투명한 물방울 한 개, 극도로 투명하고 맑은 질감, 물방울이 원래 크기에서 아주 조금만 작아졌다가 다시 원래 크기로 돌아오는 부드러운 호흡 같은 움직임, 크기 변화는 매우 미세하고 자연스러움, 섬세한 반사광.mp4" poster="droplet.jpg" autoplay muted loop playsinline></video>
       </button>
-      <div class="tinfo">
-        <div class="ttitle">${esc(t.title)}</div>
-        ${t.time?`<div class="ttime">${t.time}</div>`:''}
-      </div>
-      <button class="tdel" data-tid="${t.id}">×</button>
-    </div>`;
-  }).join('');
-  el.querySelectorAll('.tchk').forEach(b=>{
-    b.onclick=()=>{
-      const t=plan.tasks.find(x=>x.id===b.dataset.tid);
-      if(t){t.done=!t.done;savePlan(dk,plan);renderSheet(dk);
-        speak(t.done?`${t.title} 완료했어요`:`${t.title} 다시 열었어요`);}
+    </section>
+    <p class="sr-status" id="status" aria-live="polite">물방울 매니저가 준비됐어요.</p>
+  </main>
+
+  <script>
+    const STORE_KEY = "droplet-manager-minimal-v1";
+    const AI_ENDPOINT_KEY = "droplet-ai-endpoint";
+    const DEFAULT_AI_ENDPOINT = "http://localhost:8787/parse";
+    const CHECK_INTERVAL = 15000;
+
+    const drop = document.getElementById("drop");
+    const dropZone = document.getElementById("dropZone");
+    const statusEl = document.getElementById("status");
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const todayKey = () => dateKey(new Date());
+    const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+    let state = load();
+    let recognition = null;
+    let listening = false;
+    let finalTranscript = "";
+    let silenceTimer = null;
+    let mode = "idle";
+
+    function load() {
+      try {
+        return JSON.parse(localStorage.getItem(STORE_KEY)) || { tasks: [] };
+      } catch {
+        return { tasks: [] };
+      }
+    }
+
+    function save() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      scheduleBrowserNotifications();
+    }
+
+    function setMode(next, text) {
+      mode = next;
+      dropZone.classList.toggle("listening", next === "listening");
+      dropZone.classList.toggle("thinking", next === "thinking");
+      statusEl.textContent = text || "";
+    }
+
+    function speak(text) {
+      statusEl.textContent = text;
+      if (!("speechSynthesis" in window)) return;
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ko-KR";
+      utterance.rate = .92;
+      utterance.pitch = 1.02;
+      speechSynthesis.speak(utterance);
+    }
+
+    function initVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+      recognition = new SpeechRecognition();
+      recognition.lang = "ko-KR";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const phrase = event.results[i][0].transcript.trim();
+          if (event.results[i].isFinal) finalTranscript = `${finalTranscript} ${phrase}`.trim();
+          else interim = `${interim} ${phrase}`.trim();
+        }
+        const heard = [finalTranscript, interim].filter(Boolean).join(" ").trim();
+        if (heard) statusEl.textContent = heard;
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => finishListening(heard), 1700);
+      };
+      recognition.onerror = () => { setEmotion("angry", 2500); stopListening(); };
+      recognition.onend = () => {
+        if (!listening) return;
+        try { recognition.start(); } catch {}
+      };
+    }
+
+    async function startListening() {
+      if (!recognition) {
+        speak("이 브라우저에서는 음성 인식을 쓸 수 없어요.");
+        return;
+      }
+      await prepareNotificationPermission();
+      finalTranscript = "";
+      listening = true;
+      setMode("listening", "듣고 있어요.");
+      speak("네, 말씀하세요.");
+      try {
+        recognition.start();
+        navigator.vibrate?.(30);
+      } catch {
+        stopListening();
+      }
+    }
+
+    function stopListening() {
+      clearTimeout(silenceTimer);
+      listening = false;
+      try { recognition?.stop(); } catch {}
+      setMode("idle", "물방울 매니저가 준비됐어요.");
+    }
+
+    async function finishListening(text) {
+      const heard = (text || finalTranscript).trim();
+      stopListening();
+      if (!heard) return;
+      setMode("thinking", "일정을 정리하고 있어요.");
+      if (isBriefingRequest(heard)) {
+        briefToday();
+        setMode("idle", "브리핑을 마쳤어요.");
+        return;
+      }
+      const tasks = await parseSpeech(heard);
+      addTasks(tasks, heard);
+      setMode("idle", "저장했어요.");
+    }
+
+    function isBriefingRequest(text) {
+      return /오늘.*(뭐|일정|있어|브리핑)|브리핑|읽어줘|뭐\s*있어/.test(text);
+    }
+
+    async function parseSpeech(text) {
+      const endpoint = localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT;
+      if (endpoint) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, today: todayKey(), locale: "ko-KR" })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data.tasks)) return normalize(data.tasks, text);
+          }
+        } catch {}
+      }
+      return normalize(parseLocal(text), text);
+    }
+
+    function normalize(items, fallback) {
+      return items.map((item) => ({
+        id: id(),
+        title: String(item.title || fallback).trim(),
+        date: validDate(item.date) ? item.date : todayKey(),
+        time: validTime(item.time) ? item.time : "",
+        done: false,
+        reminded: false,
+        createdAt: Date.now()
+      })).filter((item) => item.title);
+    }
+
+    function parseLocal(text) {
+      return splitTasks(text).map(parseOne);
+    }
+
+    function splitTasks(text) {
+      const parts = text.split(/\s*(?:그리고|그다음|다음에|,|，)\s*/g).map((part) => part.trim()).filter(Boolean);
+      return parts.length ? parts : [text];
+    }
+
+    function parseOne(raw) {
+      let title = raw.replace(/알려줘|챙겨줘|등록해줘|저장해줘|기억해줘|일정|예약/g, " ").replace(/\s+/g, " ").trim();
+      const dateInfo = inferDate(title);
+      title = dateInfo.title;
+      const timeInfo = inferTime(title);
+      title = timeInfo.title;
+      title = title.replace(/오늘|내일|모레|오전|오후|아침|점심|저녁|밤/g, " ").replace(/\s+/g, " ").trim();
+      return {
+        title: title || raw,
+        date: dateInfo.date,
+        time: timeInfo.time
+      };
+    }
+
+    function inferDate(text) {
+      const date = new Date();
+      let title = text;
+      if (/모레/.test(text)) {
+        date.setDate(date.getDate() + 2);
+        title = title.replace(/모레/g, " ");
+      } else if (/내일/.test(text)) {
+        date.setDate(date.getDate() + 1);
+        title = title.replace(/내일/g, " ");
+      } else {
+        title = title.replace(/오늘/g, " ");
+      }
+      return { date: dateKey(date), title };
+    }
+
+    function inferTime(text) {
+      let title = text;
+      let hour = null;
+      let minute = 0;
+      const pm = /오후|저녁|밤/.test(text);
+      const am = /오전|아침/.test(text);
+      const matched = text.match(/(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분?)?/);
+      if (matched) {
+        hour = Number(matched[1]);
+        minute = matched[2] ? Number(matched[2]) : 0;
+        title = title.replace(matched[0], " ");
+      } else if (/아침/.test(text)) {
+        hour = 8;
+      } else if (/점심/.test(text)) {
+        hour = 12;
+      } else if (/저녁/.test(text)) {
+        hour = 18;
+      } else if (/밤/.test(text)) {
+        hour = 21;
+      }
+      if (hour === null) return { time: "", title };
+      if (pm && hour < 12) hour += 12;
+      if (am && hour === 12) hour = 0;
+      return { time: `${pad(hour)}:${pad(minute)}`, title };
+    }
+
+    function setEmotion(emotion, duration = 3000) {
+      drop.classList.remove("happy", "sad", "angry");
+      void drop.offsetWidth;
+      if (emotion) {
+        drop.classList.add(emotion);
+        setTimeout(() => drop.classList.remove(emotion), duration);
+      }
+    }
+
+    function bounce() { setEmotion("happy", 1500); }
+
+    // idle 상태에서 주기적으로 기쁘게 통통
+    setInterval(() => { if (mode === "idle") bounce(); }, 9000);
+
+    function addTasks(tasks, originalText) {
+      if (!tasks.length) {
+        setEmotion("sad", 3000);
+        speak("제가 잘 못 들었어요. 다시 한번 말해 주세요.");
+        return;
+      }
+      state.tasks.push(...tasks);
+      save();
+      bounce(); // 저장 성공 시 기뻐서 바운스
+      const message = tasks.length === 1
+        ? `${friendlyTask(tasks[0])} 저장했어요. 제가 챙길게요.`
+        : `${tasks.length}개 일정 저장했어요. 제가 챙길게요.`;
+      speak(message);
+      navigator.vibrate?.([35, 60, 35]);
+    }
+
+    function briefToday() {
+      const open = state.tasks
+        .filter((task) => task.date === todayKey() && !task.done)
+        .sort(compareTasks);
+      if (!open.length) {
+        speak("오늘은 남은 일정이 없어요. 제가 조용히 지켜볼게요.");
+        return;
+      }
+      const details = open.slice(0, 5).map(friendlyTask).join(", ");
+      speak(`오늘 남은 일정은 ${open.length}개예요. ${details}`);
+    }
+
+    function friendlyTask(task) {
+      return `${task.time ? spokenTime(task.time) + " " : ""}${task.title}`;
+    }
+
+    function spokenTime(time) {
+      const [hourRaw, minuteRaw] = time.split(":").map(Number);
+      const ap = hourRaw < 12 ? "오전" : "오후";
+      const hour = hourRaw === 0 ? 12 : hourRaw > 12 ? hourRaw - 12 : hourRaw;
+      return `${ap} ${hour}시${minuteRaw ? ` ${minuteRaw}분` : ""}`;
+    }
+
+    function compareTasks(a, b) {
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1;
+      if (b.time) return 1;
+      return a.createdAt - b.createdAt;
+    }
+
+    async function prepareNotificationPermission() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "default") {
+        try { await Notification.requestPermission(); } catch {}
+      }
+    }
+
+    async function initServiceWorker() {
+      if (!("serviceWorker" in navigator)) return;
+      try {
+        await navigator.serviceWorker.register("./sw.js");
+        scheduleBrowserNotifications();
+      } catch {}
+    }
+
+    async function scheduleBrowserNotifications() {
+      if (Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+      const registration = await navigator.serviceWorker.ready.catch(() => null);
+      const worker = registration?.active;
+      if (!worker) return;
+      for (const task of state.tasks) {
+        worker.postMessage({ type: "CANCEL", id: task.id });
+        if (task.done || !task.time) continue;
+        const when = new Date(`${task.date}T${task.time}:00`);
+        const delay = when.getTime() - Date.now();
+        if (delay > 0 && delay < 2147483647) {
+          worker.postMessage({
+            type: "SCHEDULE",
+            id: task.id,
+            title: "물방울 매니저",
+            body: `${friendlyTask(task)} 시간이에요.`,
+            delay
+          });
+        }
+      }
+    }
+
+    function checkDueTasks() {
+      const now = new Date();
+      const key = dateKey(now);
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      let changed = false;
+      for (const task of state.tasks) {
+        if (task.done || task.reminded || task.date !== key || !task.time) continue;
+        const [hour, minute] = task.time.split(":").map(Number);
+        const taskMinutes = hour * 60 + minute;
+        if (currentMinutes >= taskMinutes) {
+          task.reminded = true;
+          changed = true;
+          speak(`${friendlyTask(task)} 시간이에요. 이제 움직이시면 돼요.`);
+          if (Notification.permission === "granted") {
+            new Notification("물방울 매니저", { body: `${task.title} 시간이에요.` });
+          }
+          break;
+        }
+      }
+      if (changed) save();
+    }
+
+    function validDate(value) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+    }
+
+    function validTime(value) {
+      return /^\d{2}:\d{2}$/.test(String(value || ""));
+    }
+
+    drop.addEventListener("click", () => {
+      if (mode === "thinking") return;
+      if (listening) stopListening();
+      else startListening();
+    });
+
+    drop.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      briefToday();
+    });
+
+    window.dropletManager = {
+      tasks: () => state.tasks.slice(),
+      clear: () => { state = { tasks: [] }; save(); },
+      setAiEndpoint: (url) => {
+        localStorage.setItem(AI_ENDPOINT_KEY, url || "");
+        speak(url ? "AI 해석 주소를 연결했어요." : "AI 해석 주소를 비웠어요.");
+      }
     };
-  });
-  el.querySelectorAll('.tdel').forEach(b=>{
-    b.onclick=()=>{ plan.tasks=plan.tasks.filter(x=>x.id!==b.dataset.tid); savePlan(dk,plan); renderSheet(dk); };
-  });
-}
 
-// ── 할일 추가 ─────────────────────────────────────────────────
-function addTask(dk,title,time='',cat,prio='normal') {
-  if(!title.trim())return;
-  cat=cat||selCat||'other';
-  const plan=loadPlan(dk);
-  plan.tasks.push({id:genId(),title:title.trim(),time,category:cat,priority:prio,alarm:'',done:false,createdAt:Date.now()});
-  plan.tasks.sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
-    if(a.time&&b.time)return a.time<b.time?-1:1;
-    if(a.time)return -1; if(b.time)return 1; return 0;
-  });
-  savePlan(dk,plan);
-  if(dpDk===dk) renderDayPanel(dk);
-  if(sheet.classList.contains('open')) renderSheet(dk);
-  speak(`${title.trim()} 추가됐어요`);
-  showToast(`"${title.trim()}" 추가됨`);
-}
-
-// ── 음성 ──────────────────────────────────────────────────────
-function speak(text) {
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang='ko-KR'; u.rate=0.9; u.pitch=1.05;
-  u.onend=()=>{ if(blobState==='briefing') blobState='idle'; };
-  window.speechSynthesis.speak(u);
-}
-
-let recognition=null, isListening=false, vFinal='', vTimer=null;
-
-function initVoice() {
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR)return;
-  recognition=new SR();
-  recognition.lang='ko-KR'; recognition.continuous=true; recognition.interimResults=true;
-  recognition.onresult=e=>{
-    if(!isListening)return;
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal)vFinal+=(vFinal?' ':'')+e.results[i][0].transcript;
-      else interim+=e.results[i][0].transcript;
-    }
-    const disp=vFinal+(interim?(vFinal?' ':'')+interim:'');
-    setBlobVoice(disp||'듣는 중…','');
-    clearTimeout(vTimer);
-    vTimer=setTimeout(()=>{ const f=disp.trim(); stopV(); if(f)handleVoice(f); },2500);
-  };
-  recognition.onerror=e=>{ if(e.error!=='no-speech')stopV(); };
-  recognition.onend=()=>{ if(isListening){try{recognition.start();}catch(_){}} };
-}
-
-function startV() {
-  if(!recognition){showToast('음성 인식 미지원 브라우저');return;}
-  vFinal=''; clearTimeout(vTimer); isListening=true;
-  blobState='listening';
-  document.getElementById('listen-ring').classList.add('on');
-  document.getElementById('bi-hint').style.display='none';
-  setBlobVoice('말씀해 주세요','');
-  try{recognition.start();}catch(e){stopV();}
-}
-function stopV() {
-  clearTimeout(vTimer); isListening=false;
-  blobState='idle';
-  document.getElementById('listen-ring').classList.remove('on');
-  document.getElementById('bi-hint').style.display='';
-  try{recognition.stop();}catch(e){}
-  updateBlobInfo();
-}
-
-// 블롭 중앙 음성 텍스트 표시
-function setBlobVoice(main, sub) {
-  document.getElementById('bi-date').textContent='듣는 중';
-  document.getElementById('bi-count').textContent=main.slice(0,14)+(main.length>14?'…':'');
-  document.getElementById('bi-sub').textContent=sub;
-}
-
-// ── 음성 파싱 ─────────────────────────────────────────────────
-const isQ=t=>/알려줘|뭐야|뭐지|브리핑|읽어줘/.test(t);
-
-function parseVoice(text) {
-  let title=text, dateOff=0, hour=null, min=0;
-  if(/모레/.test(text)){dateOff=2;title=title.replace(/모레\s?/,'');}
-  else if(/내일/.test(text)){dateOff=1;title=title.replace(/내일\s?/,'');}
-  else title=title.replace(/오늘\s?/,'');
-  const pm=/오후/.test(title), am=/오전/.test(title);
-  title=title.replace(/(오전|오후)\s?/,'');
-  const nm=title.match(/(\d{1,2})시\s?(\d{1,2}분?)?/);
-  if(nm){hour=parseInt(nm[1]);if(nm[2])min=parseInt(nm[2]);
-    if(pm&&hour<12)hour+=12;if(am&&hour===12)hour=0;
-    title=title.replace(nm[0],'').trim();
-  } else {
-    for(const[k,v]of Object.entries(KR_NUMS)){
-      if(new RegExp(k+'시').test(title)){hour=pm&&v<12?v+12:v;title=title.replace(new RegExp(k+'시'),'').trim();break;}
-    }
-    if(/아침/.test(title)){hour=8;title=title.replace(/아침\s?/,'');}
-    else if(/점심/.test(title)){hour=12;title=title.replace(/점심\s?/,'');}
-    else if(/저녁/.test(title)){hour=18;title=title.replace(/저녁\s?/,'');}
-    else if(/밤/.test(title)){hour=21;title=title.replace(/밤\s?/,'');}
-  }
-  const td=new Date(today0()); td.setDate(td.getDate()+dateOff);
-  let prio='normal';
-  if(/중요|급해|긴급/.test(title)){prio='high';title=title.replace(/중요\s?|급해\s?|긴급\s?/g,'').trim();}
-  else if(/나중에|여유/.test(title)){prio='low';title=title.replace(/나중에\s?|여유\s?/g,'').trim();}
-  let cat='other';
-  if(/학교|수업|과제|강의|시험|공부|상담센터/.test(title))cat='school';
-  else if(/건물|관리비|임대|수리|점검|계약|청구서/.test(title))cat='manage';
-  else if(/집안일|청소|요리|장보기|빨래|설거지|정리/.test(title))cat='home';
-  return {title:title.trim()||text,date:dateKey(td),time:hour!==null?`${p2(hour)}:${p2(min)}`:'',cat,prio};
-}
-
-function parseMulti(text) {
-  const parts=text.split(/,\s*|그리고\s*|그다음에?\s*|(?:하고|먹고|마시고|마치고|끝내고|끝나고|씻고|듣고|읽고|쓰고|가고|오고|만나고|보고|운동하고|공부하고|청소하고|요리하고|빨래하고|샤워하고)\s*/);
-  const segs=parts.map(s=>s.trim()).filter(s=>s.length>1);
-  return segs.length?segs.map(parseVoice):[parseVoice(text)];
-}
-
-function handleVoice(text) {
-  if(isQ(text)){briefToday();return;}
-  // 날짜 패널 열기 명령
-  if(/^(오늘|오늘\s?일정|오늘\s?뭐야|오늘\s?뭐\s?있어)$/.test(text.trim())){
-    selDate=dateKey(today0()); openDayPanel(selDate); return;
-  }
-  if(/^(내일|내일\s?일정|내일\s?뭐야)$/.test(text.trim())){
-    const d=new Date(today0()); d.setDate(d.getDate()+1);
-    selDate=dateKey(d); openDayPanel(selDate); return;
-  }
-  if(/이번\s?주|주간/.test(text.trim())){
-    briefToday(); return;
-  }
-  const list=parseMulti(text);
-  list.forEach(p=>addTask(p.date,p.title,p.time,p.cat,p.prio));
-  if(list.length>1) showToast(`${list.length}개 할일 추가됨`);
-}
-
-function briefToday() {
-  blobState='briefing';
-  const dk=dateKey(today0());
-  const tasks=(loadPlan(dk).tasks||[]).filter(t=>!t.done);
-  const KN=['','한','두','세','네','다섯','여섯','일곱','여덟','아홉','열'];
-  const cnt=n=>(n<=10?KN[n]:n)+'가지';
-  const timeW=t=>{
-    if(!t)return '';
-    const[h,m]=t.split(':').map(Number);
-    const ap=h<12?'오전':'오후'; const hr=h>12?h-12:h;
-    return `${ap} ${hr}시`+(m===30?' 반':m>0?` ${m}분`:'')+'에 ';
-  };
-  if(!tasks.length){speak('오늘은 할 일이 없어요. 여유롭게 쉬세요.'); blobState='briefing'; return;}
-  let s=`오늘 할 일은 ${cnt(tasks.length)}예요. `;
-  tasks.forEach((t,i)=>{
-    s+=(i===0?'':(i===tasks.length-1?'마지막으로 ':'그리고 '))+timeW(t.time)+t.title+'. ';
-  });
-  speak(s); showToast('브리핑 시작');
-}
-
-// ── UI 이벤트 ─────────────────────────────────────────────────
-// 블롭 탭 → 음성 시작 / 정지
-document.getElementById('blob-path').onclick=e=>{
-  e.stopPropagation();
-  if(isListening) stopV(); else startV();
-};
-document.getElementById('blob-hl').onclick=e=>{
-  e.stopPropagation();
-  if(isListening) stopV(); else startV();
-};
-document.getElementById('sh-close').onclick=closeSheet;
-document.getElementById('dp-close').onclick=closeDayPanel;
-
-document.getElementById('add-btn').onclick=()=>{
-  const v=document.getElementById('add-inp').value.trim();
-  if(v){addTask(selDate,v);document.getElementById('add-inp').value='';}
-};
-document.getElementById('add-inp').addEventListener('keydown',e=>{
-  if(e.key==='Enter')document.getElementById('add-btn').click();
-});
-document.getElementById('dp-addbtn').onclick=()=>{
-  const v=document.getElementById('dp-inp').value.trim();
-  if(v&&dpDk){addTask(dpDk,v);document.getElementById('dp-inp').value='';renderDayPanel(dpDk);}
-};
-document.getElementById('dp-inp').addEventListener('keydown',e=>{
-  if(e.key==='Enter')document.getElementById('dp-addbtn').click();
-});
-
-// 배경 클릭 → 패널 닫기 + 색상패널 닫기
-document.addEventListener('click', e=>{
-  const keep='#dpanel,#sheet,#color-panel,#blob-path,#topbar,#blob-hl';
-  if(!e.target.closest(keep)){ closeDayPanel(); closeSheet(); }
-  if(colorOpen&&!e.target.closest('#color-panel,#btn-color')){
-    colorOpen=false; document.getElementById('color-panel').classList.remove('open');
-  }
-});
-
-// ── 토스트 ────────────────────────────────────────────────────
-let toastTm;
-function showToast(msg) {
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  clearTimeout(toastTm); toastTm=setTimeout(()=>el.classList.remove('show'),2500);
-}
-
-// ── 날짜 라벨 ─────────────────────────────────────────────────
-function updateLabel() {
-  document.getElementById('date-label').textContent=
-    new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-}
-
-// ── SW ───────────────────────────────────────────────────────
-async function initSW() {
-  if(!('serviceWorker' in navigator))return;
-  try{await navigator.serviceWorker.register('./sw.js');}catch(e){console.warn(e);}
-}
-
-// ── 리사이즈 ─────────────────────────────────────────────────
-window.addEventListener('resize', ()=>{ resizeSky(); });
-
-// ── 초기화 ───────────────────────────────────────────────────
-resizeSky();
-initStars();
-applyBlobColor(blobColor);
-initColorPanel();
-initVoice();
-initSW();
-updateLabel();
-updateBlobInfo();
-requestAnimationFrame(mainLoop);
-setInterval(updateLabel, 60000);
-setInterval(updateBlobInfo, 30000);
-</script>
+    initVoice();
+    initServiceWorker();
+    setMode("idle", "물방울 매니저가 준비됐어요.");
+    setInterval(checkDueTasks, CHECK_INTERVAL);
+  </script>
 </body>
 </html>
