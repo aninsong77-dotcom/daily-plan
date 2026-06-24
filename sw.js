@@ -1,72 +1,68 @@
-// 일일계획 Service Worker
-const CACHE = 'dailyplan-v21';
-const FILES = ['./', './index.html', './manifest.json'];
-
-self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', e => {
-    e.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-        ).then(() => self.clients.claim())
-    );
-});
-
-self.addEventListener('fetch', e => {
-    e.respondWith(
-        caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
-    );
-});
-
-// 알림 스케줄 (메인 스레드에서 메시지로 전달받음)
+const CACHE = "droplet-manager-v2";
+const FILES = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./droplet.jpg",
+  "./droplet.mp4"
+];
 const scheduledTimers = new Map();
 
-self.addEventListener('message', e => {
-    const { type, id, title, body, delay } = e.data || {};
-
-    if (type === 'SCHEDULE') {
-        // 이미 예약된 거 취소 후 재예약
-        if (scheduledTimers.has(id)) clearTimeout(scheduledTimers.get(id));
-        if (delay <= 0) return;
-        const t = setTimeout(() => {
-            self.registration.showNotification(title, {
-                body,
-                icon: './icon.png',
-                tag: id,
-                renotify: true,
-                requireInteraction: false,
-                vibrate: [200, 100, 200]
-            });
-            scheduledTimers.delete(id);
-        }, delay);
-        scheduledTimers.set(id, t);
-    }
-
-    if (type === 'CANCEL') {
-        if (scheduledTimers.has(id)) {
-            clearTimeout(scheduledTimers.get(id));
-            scheduledTimers.delete(id);
-        }
-    }
-
-    if (type === 'NOTIFY_NOW') {
-        self.registration.showNotification(title, {
-            body,
-            tag: id,
-            renotify: true,
-            vibrate: [200, 100, 200]
-        });
-    }
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));
 });
 
-self.addEventListener('notificationclick', e => {
-    e.notification.close();
-    e.waitUntil(
-        self.clients.matchAll({ type: 'window' }).then(clients => {
-            if (clients.length) return clients[0].focus();
-            return self.clients.openWindow('./');
-        })
-    );
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    caches.match(event.request)
+      .then((cached) => cached || fetch(event.request))
+      .catch(() => caches.match("./index.html"))
+  );
+});
+
+self.addEventListener("message", (event) => {
+  const { type, id, title, body, delay } = event.data || {};
+  if (!id) return;
+
+  if (type === "CANCEL") {
+    if (scheduledTimers.has(id)) {
+      clearTimeout(scheduledTimers.get(id));
+      scheduledTimers.delete(id);
+    }
+    return;
+  }
+
+  if (type === "SCHEDULE") {
+    if (scheduledTimers.has(id)) clearTimeout(scheduledTimers.get(id));
+    if (!delay || delay <= 0) return;
+    const timer = setTimeout(() => {
+      self.registration.showNotification(title || "물방울 매니저", {
+        body: body || "일정 시간이 되었어요",
+        tag: id,
+        renotify: true,
+        vibrate: [120, 80, 120]
+      });
+      scheduledTimers.delete(id);
+    }, delay);
+    scheduledTimers.set(id, timer);
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      if (clients.length) return clients[0].focus();
+      return self.clients.openWindow("./index.html");
+    })
+  );
 });
