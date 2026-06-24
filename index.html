@@ -97,16 +97,15 @@
       70%      { transform: scaleX(0.90) scaleY(1.10) translateY(4%); }
     }
 
-    /* ── 화남: 뾰족뾰족 + 떨림 ── */
+    /* ── 화남: 좌우 빠른 떨림 ── */
     .drop.angry {
-      filter: url(#f-angry);
-      animation: angry-shake 0.12s ease-in-out infinite;
-      overflow: visible; /* 뾰족한 부분이 원 밖으로 나오게 */
+      animation: angry-shake 0.08s linear infinite;
     }
     @keyframes angry-shake {
-      0%, 100% { transform: translateX(0); }
-      30%      { transform: translateX(-4px) rotate(-1deg); }
-      70%      { transform: translateX( 4px) rotate( 1deg); }
+      0%   { transform: translateX(0); }
+      25%  { transform: translateX(-6px); }
+      75%  { transform: translateX( 6px); }
+      100% { transform: translateX(0); }
     }
 
     .drop {
@@ -153,15 +152,7 @@
   </style>
 </head>
 <body>
-  <!-- 화남 뾰족 필터 -->
-  <svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden;">
-    <defs>
-      <filter id="f-angry" x="-25%" y="-25%" width="150%" height="150%">
-        <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="3" seed="8" result="noise"/>
-        <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-    </defs>
-  </svg>
+
   <main class="room">
     <section class="drop-zone" id="dropZone" aria-label="물방울 매니저">
       <button class="drop" id="drop" aria-label="물방울을 눌러 일정 말하기">
